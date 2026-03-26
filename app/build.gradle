@@ -1,0 +1,43 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.myapp'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.myapp"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Untuk signed APK via CI, uncomment dan isi signingConfig di bawah:
+            // signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // Uncomment ini jika ingin signed release APK:
+    // signingConfigs {
+    //     release {
+    //         storeFile file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
+    //         storePassword System.getenv("KEYSTORE_PASSWORD")
+    //         keyAlias System.getenv("KEY_ALIAS")
+    //         keyPassword System.getenv("KEY_PASSWORD")
+    //     }
+    // }
+}
+
+dependencies {
+    // Minimal — tidak ada dependency tambahan
+}
