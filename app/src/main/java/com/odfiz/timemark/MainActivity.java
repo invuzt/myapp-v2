@@ -1,4 +1,4 @@
-package com.myapp;
+package com.odfiz.timemark;
 
 import android.Manifest;
 import android.app.Activity;
