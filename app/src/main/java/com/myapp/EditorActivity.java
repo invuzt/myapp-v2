@@ -102,40 +102,51 @@ public class EditorActivity extends Activity {
         float bW = finalBmp.getWidth();
         float bH = finalBmp.getHeight();
         
-        // --- SCALE SYNC (Menyamakan Layar & Foto) ---
-        float ratio = bH / 1000f; // Dasar skala foto
-        float padding = 40 * ratio;
+        float ratio = bH / 1000f; 
+        float padding = 45 * ratio;
         
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.WHITE);
-        paint.setShadowLayer(5 * ratio, 0, 0, Color.BLACK);
+        paint.setShadowLayer(6 * ratio, 0, 0, Color.BLACK);
         paint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
 
-        // 1. Jam Besar
-        paint.setTextSize(85 * ratio); 
-        float yJam = bH - (150 * ratio);
-        canvas.drawText(tvTime.getText().toString(), padding, yJam, paint);
+        // 1. Ambil Tinggi Jam untuk Patokan Garis
+        float jamSize = 85 * ratio;
+        paint.setTextSize(jamSize);
+        Rect jamBounds = new Rect();
+        String timeStr = tvTime.getText().toString();
+        paint.getTextBounds(timeStr, 0, timeStr.length(), jamBounds);
+        
+        float yBaselineJam = bH - (180 * ratio);
+        float jamTop = yBaselineJam - jamBounds.height();
+        float jamBottom = yBaselineJam;
 
-        // 2. Garis Kuning
-        float timeWidth = paint.measureText(tvTime.getText().toString());
-        float xGaris = padding + timeWidth + (15 * ratio);
+        // 2. Gambar Jam
+        canvas.drawText(timeStr, padding, yBaselineJam, paint);
+
+        // 3. Garis Kuning (Tinggi persis sama dengan Jam)
+        float xGaris = padding + paint.measureText(timeStr) + (18 * ratio);
         paint.setColor(Color.parseColor("#FFD700"));
-        paint.setStrokeWidth(4 * ratio);
-        canvas.drawLine(xGaris, yJam - (75 * ratio), xGaris, yJam, paint);
+        paint.setStrokeWidth(5 * ratio);
+        canvas.drawLine(xGaris, jamTop, xGaris, jamBottom, paint);
 
-        // 3. Tanggal & Hari
+        // 4. Tanggal & Hari (Sejajar Atas & Bawah Garis)
         paint.setColor(Color.WHITE);
-        paint.setTextSize(25 * ratio);
+        paint.setTextSize(26 * ratio);
         paint.setStrokeWidth(1);
-        canvas.drawText(tvDate.getText().toString(), xGaris + (15 * ratio), yJam - (45 * ratio), paint);
-        canvas.drawText(tvDay.getText().toString(), xGaris + (15 * ratio), yJam - (10 * ratio), paint);
+        paint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL));
+        
+        // Tanggal mepet atas garis
+        canvas.drawText(tvDate.getText().toString(), xGaris + (18 * ratio), jamTop + (24 * ratio), paint);
+        // Hari mepet bawah garis
+        canvas.drawText(tvDay.getText().toString(), xGaris + (18 * ratio), jamBottom - (2 * ratio), paint);
 
-        // 4. Alamat (Multi-line)
-        paint.setTextSize(22 * ratio);
+        // 5. Alamat (Di bawah Jam)
+        paint.setTextSize(23 * ratio);
         TextPaint tp = new TextPaint(paint);
         StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, (int)(bW - (padding * 2)), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
         canvas.save();
-        canvas.translate(padding, yJam + (30 * ratio));
+        canvas.translate(padding, jamBottom + (25 * ratio));
         sl.draw(canvas);
         canvas.restore();
 
@@ -153,9 +164,8 @@ public class EditorActivity extends Activity {
                 OutputStream os = getContentResolver().openOutputStream(uri);
                 bmp.compress(Bitmap.CompressFormat.JPEG, 95, os);
                 os.close();
-                Toast.makeText(this, "Tersimpan!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Foto Tersimpan!", Toast.LENGTH_SHORT).show();
                 
-                // --- BALIK KE KAMERA LAGI ---
                 startActivity(new Intent(this, MainActivity.class));
                 finish();
             }
