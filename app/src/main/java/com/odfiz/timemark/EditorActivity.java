@@ -10,6 +10,7 @@ import android.location.*;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.*;
 import android.widget.*;
 import java.io.*;
 import java.text.SimpleDateFormat;
@@ -25,7 +26,6 @@ public class EditorActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Trik Anti-Putih: Set background gelap dulu
         getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
         setContentView(R.layout.activity_editor);
         
@@ -37,24 +37,24 @@ public class EditorActivity extends Activity {
         tvAddress = findViewById(R.id.tvAddress);
         etWatermark = findViewById(R.id.editWatermarkText);
 
-        // Jalankan loading di Thread terpisah agar UI tidak freeze
-        new Thread(this::loadPhotoTask).start();
+        loadPhotoSync(); // Pakai cara sinkron tapi dioptimasi agar tidak blank putih
+        startGPS();
 
         findViewById(R.id.btnCancel).setOnClickListener(v -> {
             startActivity(new Intent(this, MainActivity.class));
             finish();
         });
 
-        findViewById(R.id.btnSave).setOnClickListener(v -> saveProcessedImage());
+        findViewById(R.id.btnSave).setOnClickListener(v -> saveWithWatermark());
     }
 
-    private void loadPhotoTask() {
+    private void loadPhotoSync() {
         String uriStr = getIntent().getStringExtra("PHOTO_URI");
         if (uriStr == null) return;
         try {
             Uri uri = Uri.parse(uriStr);
             BitmapFactory.Options opt = new BitmapFactory.Options();
-            opt.inSampleSize = 2; // Hemat RAM agar tidak blank putih
+            opt.inSampleSize = 2; 
             InputStream is = getContentResolver().openInputStream(uri);
             Bitmap raw = BitmapFactory.decodeStream(is);
             is.close();
@@ -64,10 +64,8 @@ public class EditorActivity extends Activity {
                 baseBmp = Bitmap.createBitmap(raw, 0, 0, raw.getWidth(), raw.getHeight(), m, true);
             } else { baseBmp = raw; }
             
-            runOnUiThread(() -> {
-                imgView.setImageBitmap(baseBmp);
-                updateLabels();
-            });
+            imgView.setImageBitmap(baseBmp);
+            updateLabels();
         } catch (Exception e) {}
     }
 
@@ -75,16 +73,66 @@ public class EditorActivity extends Activity {
         String t = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
         String d = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(new Date());
         String y = new SimpleDateFormat("EEE", Locale.getDefault()).format(new Date());
-        String a = prefs.getString("last_addr", "Lokasi...");
+        // Ambil lokasi terakhir dari memori agar TIDAK LOADING TERUS
+        String a = prefs.getString("last_addr", "Mencari lokasi...");
 
         tvTime.setText(t); tvDate.setText(d); tvDay.setText(y); tvAddress.setText(a);
         etWatermark.setText(t + "|" + d + "|" + y + "|" + a);
     }
 
-    private void saveProcessedImage() {
+    private void startGPS() {
+        try {
+            LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+            Location loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            if (loc != null) {
+                Geocoder g = new Geocoder(this, Locale.getDefault());
+                List<Address> addrs = g.getFromLocation(loc.getLatitude(), loc.getLongitude(), 1);
+                if (addrs != null && !addrs.isEmpty()) {
+                    String addr = addrs.get(0).getAddressLine(0);
+                    prefs.edit().putString("last_addr", addr).apply();
+                    runOnUiThread(() -> {
+                        tvAddress.setText(addr);
+                        String t = tvTime.getText().toString();
+                        String d = tvDate.getText().toString();
+                        String y = tvDay.getText().toString();
+                        etWatermark.setText(t + "|" + d + "|" + y + "|" + addr);
+                    });
+                }
+            }
+        } catch (Exception e) {}
+    }
+
+    private void saveWithWatermark() {
         if (baseBmp == null) return;
+        Toast.makeText(this, "Memproses...", Toast.LENGTH_SHORT).show();
+
+        // BUAT WATERMARK MANUAL KE FILE (JAM & ALAMAT)
+        Bitmap out = baseBmp.copy(Bitmap.Config.ARGB_8888, true);
+        Canvas cv = new Canvas(out);
+        float ratio = out.getHeight() / 1000f;
+        float padding = 40 * ratio;
+
+        Paint pt = new Paint(Paint.ANTI_ALIAS_FLAG);
+        pt.setColor(Color.WHITE);
+        pt.setShadowLayer(4 * ratio, 0, 0, Color.BLACK);
         
-        // Simpan apa adanya (Tanpa Watermark tambahan di file)
+        // Gambar Jam
+        pt.setTextSize(80 * ratio);
+        pt.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        cv.drawText(tvTime.getText().toString(), padding, out.getHeight() - (180 * ratio), pt);
+
+        // Gambar Alamat (Pindah Baris Otomatis)
+        pt.setTextSize(25 * ratio);
+        pt.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
+        TextPaint tp = new TextPaint(pt);
+        StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, (int)(out.getWidth() - (padding*2)), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+        
+        cv.save();
+        cv.translate(padding, out.getHeight() - (150 * ratio));
+        sl.draw(cv);
+        cv.restore();
+
+        // SIMPAN KE GALERI
         ContentValues v = new ContentValues();
         v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_" + System.currentTimeMillis() + ".jpg");
         v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
@@ -94,14 +142,12 @@ public class EditorActivity extends Activity {
             Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
             if (u != null) {
                 OutputStream os = getContentResolver().openOutputStream(u);
-                baseBmp.compress(Bitmap.CompressFormat.JPEG, 95, os);
+                out.compress(Bitmap.CompressFormat.JPEG, 90, os);
                 os.close();
-                Toast.makeText(this, "Tersimpan di Galeri!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Berhasil!", Toast.LENGTH_SHORT).show();
                 startActivity(new Intent(this, MainActivity.class));
                 finish();
             }
-        } catch (Exception e) {
-            Toast.makeText(this, "Gagal: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
+        } catch (Exception e) {}
     }
 }
