@@ -16,7 +16,7 @@ import java.util.*;
 
 public class EditorActivity extends Activity {
     private ImageView imageView;
-    private View watermarkOverlay; // Diganti View (Container)
+    private View watermarkOverlay;
     private TextView tvTime, tvDate, tvDay, tvAddress;
     private EditText editWatermark;
     private Bitmap originalBitmap;
@@ -37,13 +37,13 @@ public class EditorActivity extends Activity {
         loadPhoto();
         generateAutomaticMetadata();
 
-        // Agar EditText juga bisa merubah tampilan real-time
         editWatermark.addTextChangedListener(new TextWatcher() {
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 if (s.length() > 0) {
                     try {
-                        String[] parts = s.toString().split("\|");
+                        // Menggunakan Quoted Pattern agar aman dari error escape
+                        String[] parts = s.toString().split(java.util.regex.Pattern.quote("|"));
                         if (parts.length >= 4) {
                             tvTime.setText(parts[0]);
                             tvDate.setText(parts[1]);
@@ -85,7 +85,7 @@ public class EditorActivity extends Activity {
         String sTime = sdfTime.format(new Date());
         String sDate = sdfDate.format(new Date());
         String sDay = sdfDay.format(new Date());
-        String sAddress = "GPS: Menentukan lokasi...";
+        String sAddress = "Mencari alamat...";
         
         try {
             LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -97,15 +97,12 @@ public class EditorActivity extends Activity {
                     sAddress = addresses.get(0).getAddressLine(0);
                 }
             }
-        } catch (Exception e) { sAddress = "GPS/Internet tidak tersedia"; }
+        } catch (Exception e) { sAddress = "GPS/Internet mati"; }
 
-        // Tampilkan di layar
         tvTime.setText(sTime);
         tvDate.setText(sDate);
         tvDay.setText(sDay);
         tvAddress.setText(sAddress);
-
-        // Set di EditText (untuk diedit, pisahkan dengan '|')
         editWatermark.setText(sTime + "|" + sDate + "|" + sDay + "|" + sAddress);
     }
 
@@ -114,53 +111,44 @@ public class EditorActivity extends Activity {
         Bitmap finalBmp = originalBitmap.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(finalBmp);
         
-        // --- LOGIKA GAYA WATERMARK ODFIZ ---
         float bW = finalBmp.getWidth();
         float bH = finalBmp.getHeight();
-        float padding = bW / 30; // Proporsional
+        float padding = bW / 30;
 
-        // 1. Cat dasar teks
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.WHITE);
-        paint.setShadowLayer(5f, 0f, 0f, Color.BLACK); // Biar keliatan di background terang
+        paint.setShadowLayer(8f, 0f, 0f, Color.BLACK);
         paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
 
-        // 2. Teks Jam (Besar)
+        // Jam (Style Besar)
         String sTime = tvTime.getText().toString();
-        paint.setTextSize(bH / 15); // Jam Besar
+        paint.setTextSize(bH / 12); 
         float xJam = padding;
-        float yJam = bH - padding * 3;
+        float yJam = bH - padding * 4;
         canvas.drawText(sTime, xJam, yJam, paint);
 
-        // 3. Garis Vertikal Pemisah
+        // Garis Vertikal
         float timeWidth = paint.measureText(sTime);
-        float xGaris = xJam + timeWidth + padding / 2;
-        float yGarisTop = yJam - (bH / 15); // Sama tinggi jam
+        float xGaris = xJam + timeWidth + padding / 1.5f;
+        float yGarisTop = yJam - (bH / 12);
         float yGarisBot = yJam;
-        paint.setStrokeWidth(4f);
+        paint.setStrokeWidth(6f);
         canvas.drawLine(xGaris, yGarisTop, xGaris, yGarisBot, paint);
 
-        // 4. Teks Tanggal & Hari (Kecil, di samping jam)
-        paint.setStrokeWidth(1f); // Reset stroke
-        paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
-        paint.setTextSize(bH / 45); // Kecil
-        float xDate = xGaris + padding / 2;
-        float yDate = yGarisTop + (paint.getTextSize()); // Agak atas
-        canvas.drawText(tvDate.getText().toString(), xDate, yDate, paint);
+        // Tanggal & Hari
+        paint.setStrokeWidth(1f);
+        paint.setTextSize(bH / 35);
+        float xDate = xGaris + padding / 1.5f;
+        canvas.drawText(tvDate.getText().toString(), xDate, yGarisTop + (paint.getTextSize() * 1.2f), paint);
+        canvas.drawText(tvDay.getText().toString(), xDate, yGarisBot - (paint.getTextSize() * 0.2f), paint);
 
-        float yDay = yGarisBot - (paint.getTextSize()); // Agak bawah
-        canvas.drawText(tvDay.getText().toString(), xDate, yDay, paint);
-
-        // 5. Teks Alamat (Kecil, di bawah jam)
-        paint.setTextSize(bH / 50); // Lebih kecil lagi
-        float xAddr = padding;
-        float yAddr = yJam + (paint.getTextSize() * 2);
-        
-        // Handle Alamat Panjang (Bungkus Teks)
+        // Alamat (Di bawah Jam)
+        paint.setTextSize(bH / 45);
+        float yAddr = yJam + (paint.getTextSize() * 2.5f);
         TextPaint tp = new TextPaint(paint);
         StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, (int)(bW - padding * 2), Layout.Alignment.ALIGN_NORMAL, 1f, 0f, false);
         canvas.save();
-        canvas.translate(xAddr, yAddr);
+        canvas.translate(padding, yAddr);
         sl.draw(canvas);
         canvas.restore();
 
@@ -169,7 +157,7 @@ public class EditorActivity extends Activity {
 
     private void saveImage(Bitmap bmp) {
         ContentValues v = new ContentValues();
-        v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_" + System.currentTimeMillis() + ".jpg");
+        v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_Style_" + System.currentTimeMillis() + ".jpg");
         v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
         v.put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/Camera");
 
@@ -179,9 +167,9 @@ public class EditorActivity extends Activity {
                 OutputStream os = getContentResolver().openOutputStream(uri);
                 bmp.compress(Bitmap.CompressFormat.JPEG, 95, os);
                 os.close();
-                Toast.makeText(this, "Tersimpan di Galeri!", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Berhasil simpan ke Galeri!", Toast.LENGTH_LONG).show();
                 finish();
             }
-        } catch (Exception e) { Toast.makeText(this, "Error simpan", Toast.LENGTH_SHORT).show(); }
+        } catch (Exception e) { Toast.makeText(this, "Gagal simpan", Toast.LENGTH_SHORT).show(); }
     }
 }
