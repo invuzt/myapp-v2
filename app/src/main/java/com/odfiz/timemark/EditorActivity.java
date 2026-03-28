@@ -5,6 +5,7 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.*;
+import android.graphics.drawable.ColorDrawable; // INI YANG TADI KURANG, MAS!
 import android.location.*;
 import android.net.Uri;
 import android.os.Bundle;
@@ -30,14 +31,13 @@ public class EditorActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Trik Anti-Putih: Set background gelap dulu sebelum layout dimuat
+        // Layar Hitam Anti-Putih
         getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
         setContentView(R.layout.activity_editor);
         
         prefs = getSharedPreferences("OdfizPrefs", MODE_PRIVATE);
         initViews();
         
-        // Delay loading agar UI muncul dulu tanpa putih-putih
         imgView.postDelayed(this::loadOptimizedPhoto, 300);
 
         findViewById(R.id.btnCancel).setOnClickListener(v -> {
@@ -79,7 +79,7 @@ public class EditorActivity extends Activity {
         try {
             Uri uri = Uri.parse(uriStr);
             BitmapFactory.Options opt = new BitmapFactory.Options();
-            opt.inSampleSize = 2; // Paksa kecilin biar RAM nggak sesak
+            opt.inSampleSize = 2;
             InputStream is = getContentResolver().openInputStream(uri);
             Bitmap raw = BitmapFactory.decodeStream(is);
             is.close();
@@ -131,12 +131,10 @@ public class EditorActivity extends Activity {
 
     private void saveToGallery() {
         if (baseBmp == null) return;
-        Toast.makeText(this, "Memproses Gambar...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Odfiz Engine: Finalizing...", Toast.LENGTH_SHORT).show();
 
         Bitmap out = baseBmp.copy(Bitmap.Config.ARGB_8888, true);
         Canvas cv = new Canvas(out);
-        
-        // Kalkulasi Rasio agar TIDAK TERPOTONG
         float ratio = out.getHeight() / 1000f;
         float padding = 40 * ratio;
 
@@ -145,17 +143,15 @@ public class EditorActivity extends Activity {
         pt.setShadowLayer(4 * ratio, 0, 0, Color.BLACK);
         pt.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
         
-        // Gambar Jam (Besar)
-        pt.setTextSize(90 * ratio);
-        String timeStr = tvTime.getText().toString();
-        cv.drawText(timeStr, padding, out.getHeight() - (180 * ratio), pt);
+        // Watermark Waktu
+        pt.setTextSize(85 * ratio);
+        cv.drawText(tvTime.getText().toString(), padding, out.getHeight() - (180 * ratio), pt);
 
-        // Gambar Alamat (Kecil & Otomatis Pindah Baris)
+        // Alamat Auto-Wrap
         pt.setTextSize(25 * ratio);
         pt.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
         TextPaint tp = new TextPaint(pt);
-        int maxWidth = (int) (out.getWidth() - (padding * 2));
-        
+        int maxWidth = (int) (out.getWidth() - (padding * 2.5));
         StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, maxWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
         
         cv.save();
@@ -163,7 +159,14 @@ public class EditorActivity extends Activity {
         sl.draw(cv);
         cv.restore();
 
-        // Simpan
+        // LOGO ODFIZ di Pojok Kanan Bawah
+        pt.setColor(Color.parseColor("#4CAF50")); // Hijau Odfiz
+        pt.setTextSize(35 * ratio);
+        pt.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC));
+        String logo = "ODFIZ ENGINE";
+        float logoWidth = pt.measureText(logo);
+        cv.drawText(logo, out.getWidth() - logoWidth - padding, out.getHeight() - padding, pt);
+
         ContentValues v = new ContentValues();
         v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_" + System.currentTimeMillis() + ".jpg");
         v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
@@ -175,7 +178,7 @@ public class EditorActivity extends Activity {
                 OutputStream os = getContentResolver().openOutputStream(u);
                 out.compress(Bitmap.CompressFormat.JPEG, 90, os);
                 os.close();
-                Toast.makeText(this, "Berhasil!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Tersimpan!", Toast.LENGTH_SHORT).show();
                 startActivity(new Intent(this, MainActivity.class));
                 finish();
             }
