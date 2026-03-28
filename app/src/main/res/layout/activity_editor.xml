@@ -4,14 +4,44 @@
     <RelativeLayout android:id="@+id/photo_container" 
         android:layout_width="match_parent" android:layout_height="match_parent"
         android:layout_above="@+id/editor_tools">
+        
         <ImageView android:id="@+id/imageViewEditor" 
             android:layout_width="match_parent" android:layout_height="match_parent"
             android:scaleType="fitCenter" />
-        <TextView android:id="@+id/watermarkOverlay" 
+            
+        <LinearLayout android:id="@+id/watermarkOverlay" 
             android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true" android:layout_alignParentRight="true"
-            android:layout_margin="15dp" android:textColor="#AAFFFFFF" 
-            android:textSize="20sp" android:textStyle="bold" android:text="odfiz" />
+            android:layout_alignParentBottom="true" android:layout_alignParentLeft="true"
+            android:layout_margin="15dp" android:orientation="vertical"
+            android:textColor="#FFFFFF" android:textStyle="bold">
+            
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="center_vertical">
+                
+                <TextView android:id="@+id/tvTime" 
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="17:54" android:textColor="#FFFFFF" android:textSize="40sp" android:textStyle="bold" />
+                    
+                <View android:layout_width="2dp" android:layout_height="40dp"
+                    android:layout_marginLeft="8dp" android:layout_marginRight="8dp"
+                    android:background="@drawable/vertical_divider" />
+                    
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView android:id="@+id/tvDate" 
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="28/03/2026" android:textColor="#FFFFFF" android:textSize="12sp" />
+                    <TextView android:id="@+id/tvDay" 
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Sat" android:textColor="#FFFFFF" android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView android:id="@+id/tvAddress" 
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginTop="5dp" android:maxWidth="250dp"
+                android:text="Jl. Nusa Indah, Caruban..." android:textColor="#FFFFFF" android:textSize="10sp" />
+        </LinearLayout>
     </RelativeLayout>
 
     <LinearLayout android:id="@+id/editor_tools" 
@@ -20,15 +50,15 @@
         android:background="#222222" android:padding="10dp">
         <EditText android:id="@+id/editWatermarkText" 
             android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="Masukkan teks watermark..." android:textColor="#FFFFFF"
-            android:backgroundTint="#FFFFFF" android:layout_marginBottom="10dp"/>
+            android:hint="Edit data..." android:textColor="#FFFFFF"
+            android:backgroundTint="#FFFFFF" android:layout_marginBottom="10dp" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
             <Button android:id="@+id/btnCancel" android:layout_width="0dp" 
                 android:layout_weight="1" android:layout_height="wrap_content" 
                 android:text="Batal" android:backgroundTint="#FF5555" android:layout_marginRight="5dp"/>
             <Button android:id="@+id/btnSave" android:layout_width="0dp" 
                 android:layout_weight="1" android:layout_height="wrap_content" 
-                android:text="Simpan &amp; Bagikan" android:layout_marginLeft="5dp"/>
+                android:text="Simpan" android:layout_marginLeft="5dp"/>
         </LinearLayout>
     </LinearLayout>
 </RelativeLayout>
