@@ -82,7 +82,7 @@ public class EditorActivity extends Activity {
         String sTime = sdfTime.format(new Date());
         String sDate = sdfDate.format(new Date());
         String sDay = sdfDay.format(new Date());
-        String sAddress = "GPS: Menentukan lokasi...";
+        String sAddress = "GPS: Mencari alamat...";
         
         try {
             LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -94,7 +94,7 @@ public class EditorActivity extends Activity {
                     sAddress = addresses.get(0).getAddressLine(0);
                 }
             }
-        } catch (Exception e) { sAddress = "GPS/Internet tidak tersedia"; }
+        } catch (Exception e) { sAddress = "GPS/Internet bermasalah"; }
 
         tvTime.setText(sTime);
         tvDate.setText(sDate);
@@ -111,54 +111,56 @@ public class EditorActivity extends Activity {
         float bW = finalBmp.getWidth();
         float bH = finalBmp.getHeight();
         
-        // --- PERHITUNGAN GAYA WATERMARK ODFIZ BARU ---
-        // Naikkan koordinat Y agar tidak mepet bawah
+        // --- PERHITUNGAN GAYA WATERMARK ODFIZ (SESUAI CONTOH) ---
+        // Koordinat dinaikkan agar aman dari pemotongan Galeri
         float paddingL = bW / 18; 
-        float paddingB = bH / 10; // Dinaikkan tinggi (10% dari tinggi foto)
+        float paddingB = bH / 10; 
 
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.WHITE);
         paint.setShadowLayer(8f, 0f, 0f, Color.BLACK); 
-        paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        // Pakai font SANS_SERIF bawaan Android agar lebih mirip contoh
+        paint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
 
-        // 1. Teks Jam (Besar)
+        // 1. Teks Jam (Besar, Ramping)
         String sTime = tvTime.getText().toString();
         paint.setTextSize(bH / 12); // Jam Besar
         float xJam = paddingL;
-        // Hitung Y agar Jam berada di atas Alamat
-        float yJam = bH - paddingB - (bH / 20); 
+        // Y Jam dihitung agar berada di atas alamat
+        float yJam = bH - paddingB - (bH / 18); 
         canvas.drawText(sTime, xJam, yJam, paint);
 
-        // 2. Garis Vertikal Pemisah
+        // 2. Garis Vertikal Pemisah (WARNA KUNING)
         float timeWidth = paint.measureText(sTime);
         float xGaris = xJam + timeWidth + paddingL / 2;
         float yGarisTop = yJam - (bH / 12); // Sama tinggi jam
         float yGarisBot = yJam;
+        paint.setColor(Color.parseColor("#FFD700")); // Kuning Emas
         paint.setStrokeWidth(6f);
         canvas.drawLine(xGaris, yGarisTop, xGaris, yGarisBot, paint);
 
-        // 3. Teks Tanggal & Hari (Kecil)
+        // 3. Teks Tanggal & Hari (Kecil, Putih)
+        paint.setColor(Color.WHITE); // Reset warna ke putih
         paint.setStrokeWidth(1f); 
         paint.setTextSize(bH / 38); // Tanggal Kecil
         float xDate = xGaris + paddingL / 2;
         canvas.drawText(tvDate.getText().toString(), xDate, yGarisTop + (paint.getTextSize() * 1.3f), paint);
         canvas.drawText(tvDay.getText().toString(), xDate, yGarisBot - (paint.getTextSize() * 0.3f), paint);
 
-        // 4. Teks Alamat (Di bawah jam, dinaikkan tinggi)
-        paint.setTextSize(bH / 45); 
+        // 4. Teks Alamat (Di bawah jam, Putih, Bungkus otomatis)
+        paint.setTextSize(bH / 45); // Alamat Lebih Kecil
         float xAddr = paddingL;
-        // Hitung Y Alamat yang aman (tepat di bawah Jam)
-        float yAddrTop = yJam + (paint.getTextSize() * 1.5f);
+        // Y Alamat tepat di bawah Jam
+        float yAddrTop = yJam + (paint.getTextSize() * 1.6f);
         
-        // Handle Alamat Panjang (Bungkus Teks)
         TextPaint tp = new TextPaint(paint);
         int targetWidth = (int)(bW - paddingL * 2);
         StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, targetWidth, Layout.Alignment.ALIGN_NORMAL, 1f, 0f, false);
         
-        // Jika teks alamat sangat panjang, dinaikkan lagi ke atas
+        // Proteksi: Jika alamat sangat panjang, naikkan container jam agar alamat tidak terpotong bawah
         float actualYAddr = yAddrTop;
-        if (yAddrTop + sl.getHeight() > bH - paddingL) {
-             actualYAddr = bH - sl.getHeight() - paddingL;
+        if (yAddrTop + sl.getHeight() > bH - (bH/50)) {
+             actualYAddr = bH - sl.getHeight() - (bH/50);
         }
 
         canvas.save();
@@ -171,7 +173,7 @@ public class EditorActivity extends Activity {
 
     private void saveImage(Bitmap bmp) {
         ContentValues v = new ContentValues();
-        v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_Style_" + System.currentTimeMillis() + ".jpg");
+        v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_Timemark_" + System.currentTimeMillis() + ".jpg");
         v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
         v.put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/Camera");
 
@@ -181,7 +183,7 @@ public class EditorActivity extends Activity {
                 OutputStream os = getContentResolver().openOutputStream(uri);
                 bmp.compress(Bitmap.CompressFormat.JPEG, 95, os);
                 os.close();
-                Toast.makeText(this, "Berhasil simpan ke DCIM/Camera!", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Tersimpan di DCIM/Camera!", Toast.LENGTH_LONG).show();
                 finish();
             }
         } catch (Exception e) { Toast.makeText(this, "Gagal simpan", Toast.LENGTH_SHORT).show(); }

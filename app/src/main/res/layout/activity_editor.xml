@@ -20,7 +20,8 @@
                 
                 <TextView android:id="@+id/tvTime" 
                     android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="18:14" android:textColor="#FFFFFF" android:textSize="45sp" android:textStyle="bold" />
+                    android:text="17:54" android:textColor="#FFFFFF" android:textSize="45sp" 
+                    android:fontFamily="sans-serif-condensed" android:textStyle="bold" />
                     
                 <View android:layout_width="2dp" android:layout_height="40dp"
                     android:layout_marginLeft="10dp" android:layout_marginRight="10dp"
@@ -30,17 +31,21 @@
                     android:orientation="vertical">
                     <TextView android:id="@+id/tvDate" 
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="28/03/2026" android:textColor="#FFFFFF" android:textSize="14sp" />
+                        android:text="28/03/2026" android:textColor="#FFFFFF" android:textSize="14sp"
+                        android:fontFamily="sans-serif-condensed" />
                     <TextView android:id="@+id/tvDay" 
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="Sat" android:textColor="#FFFFFF" android:textSize="14sp" />
+                        android:text="Sat" android:textColor="#FFFFFF" android:textSize="14sp"
+                        android:fontFamily="sans-serif-condensed" />
                 </LinearLayout>
             </LinearLayout>
 
             <TextView android:id="@+id/tvAddress" 
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginTop="8dp" android:maxWidth="280dp"
-                android:text="Jl. Nusa Indah, Caruban, Bangunsari, Kec. Mejayan..." android:textColor="#FFFFFF" android:textSize="11sp" />
+                android:layout_marginTop="5dp" android:maxWidth="280dp"
+                android:text="Jl. Nusa Indah, Caruban, Bangunsari, Kec. Mejayan..." 
+                android:textColor="#FFFFFF" android:textSize="11sp"
+                android:fontFamily="sans-serif-condensed" />
         </LinearLayout>
     </RelativeLayout>
 
