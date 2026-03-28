@@ -16,7 +16,6 @@ import java.util.*;
 
 public class EditorActivity extends Activity {
     private ImageView imageView;
-    private View watermarkOverlay;
     private TextView tvTime, tvDate, tvDay, tvAddress;
     private EditText editWatermark;
     private Bitmap originalBitmap;
@@ -27,7 +26,6 @@ public class EditorActivity extends Activity {
         setContentView(R.layout.activity_editor);
 
         imageView = findViewById(R.id.imageViewEditor);
-        watermarkOverlay = findViewById(R.id.watermarkOverlay);
         tvTime = findViewById(R.id.tvTime);
         tvDate = findViewById(R.id.tvDate);
         tvDay = findViewById(R.id.tvDay);
@@ -42,7 +40,6 @@ public class EditorActivity extends Activity {
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 if (s.length() > 0) {
                     try {
-                        // Menggunakan Quoted Pattern agar aman dari error escape
                         String[] parts = s.toString().split(java.util.regex.Pattern.quote("|"));
                         if (parts.length >= 4) {
                             tvTime.setText(parts[0]);
@@ -85,7 +82,7 @@ public class EditorActivity extends Activity {
         String sTime = sdfTime.format(new Date());
         String sDate = sdfDate.format(new Date());
         String sDay = sdfDay.format(new Date());
-        String sAddress = "Mencari alamat...";
+        String sAddress = "GPS: Menentukan lokasi...";
         
         try {
             LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -97,7 +94,7 @@ public class EditorActivity extends Activity {
                     sAddress = addresses.get(0).getAddressLine(0);
                 }
             }
-        } catch (Exception e) { sAddress = "GPS/Internet mati"; }
+        } catch (Exception e) { sAddress = "GPS/Internet tidak tersedia"; }
 
         tvTime.setText(sTime);
         tvDate.setText(sDate);
@@ -113,42 +110,59 @@ public class EditorActivity extends Activity {
         
         float bW = finalBmp.getWidth();
         float bH = finalBmp.getHeight();
-        float padding = bW / 30;
+        
+        // --- PERHITUNGAN GAYA WATERMARK ODFIZ BARU ---
+        // Naikkan koordinat Y agar tidak mepet bawah
+        float paddingL = bW / 18; 
+        float paddingB = bH / 10; // Dinaikkan tinggi (10% dari tinggi foto)
 
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.WHITE);
-        paint.setShadowLayer(8f, 0f, 0f, Color.BLACK);
+        paint.setShadowLayer(8f, 0f, 0f, Color.BLACK); 
         paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
 
-        // Jam (Style Besar)
+        // 1. Teks Jam (Besar)
         String sTime = tvTime.getText().toString();
-        paint.setTextSize(bH / 12); 
-        float xJam = padding;
-        float yJam = bH - padding * 4;
+        paint.setTextSize(bH / 12); // Jam Besar
+        float xJam = paddingL;
+        // Hitung Y agar Jam berada di atas Alamat
+        float yJam = bH - paddingB - (bH / 20); 
         canvas.drawText(sTime, xJam, yJam, paint);
 
-        // Garis Vertikal
+        // 2. Garis Vertikal Pemisah
         float timeWidth = paint.measureText(sTime);
-        float xGaris = xJam + timeWidth + padding / 1.5f;
-        float yGarisTop = yJam - (bH / 12);
+        float xGaris = xJam + timeWidth + paddingL / 2;
+        float yGarisTop = yJam - (bH / 12); // Sama tinggi jam
         float yGarisBot = yJam;
         paint.setStrokeWidth(6f);
         canvas.drawLine(xGaris, yGarisTop, xGaris, yGarisBot, paint);
 
-        // Tanggal & Hari
-        paint.setStrokeWidth(1f);
-        paint.setTextSize(bH / 35);
-        float xDate = xGaris + padding / 1.5f;
-        canvas.drawText(tvDate.getText().toString(), xDate, yGarisTop + (paint.getTextSize() * 1.2f), paint);
-        canvas.drawText(tvDay.getText().toString(), xDate, yGarisBot - (paint.getTextSize() * 0.2f), paint);
+        // 3. Teks Tanggal & Hari (Kecil)
+        paint.setStrokeWidth(1f); 
+        paint.setTextSize(bH / 38); // Tanggal Kecil
+        float xDate = xGaris + paddingL / 2;
+        canvas.drawText(tvDate.getText().toString(), xDate, yGarisTop + (paint.getTextSize() * 1.3f), paint);
+        canvas.drawText(tvDay.getText().toString(), xDate, yGarisBot - (paint.getTextSize() * 0.3f), paint);
 
-        // Alamat (Di bawah Jam)
-        paint.setTextSize(bH / 45);
-        float yAddr = yJam + (paint.getTextSize() * 2.5f);
+        // 4. Teks Alamat (Di bawah jam, dinaikkan tinggi)
+        paint.setTextSize(bH / 45); 
+        float xAddr = paddingL;
+        // Hitung Y Alamat yang aman (tepat di bawah Jam)
+        float yAddrTop = yJam + (paint.getTextSize() * 1.5f);
+        
+        // Handle Alamat Panjang (Bungkus Teks)
         TextPaint tp = new TextPaint(paint);
-        StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, (int)(bW - padding * 2), Layout.Alignment.ALIGN_NORMAL, 1f, 0f, false);
+        int targetWidth = (int)(bW - paddingL * 2);
+        StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, targetWidth, Layout.Alignment.ALIGN_NORMAL, 1f, 0f, false);
+        
+        // Jika teks alamat sangat panjang, dinaikkan lagi ke atas
+        float actualYAddr = yAddrTop;
+        if (yAddrTop + sl.getHeight() > bH - paddingL) {
+             actualYAddr = bH - sl.getHeight() - paddingL;
+        }
+
         canvas.save();
-        canvas.translate(padding, yAddr);
+        canvas.translate(xAddr, actualYAddr);
         sl.draw(canvas);
         canvas.restore();
 
@@ -167,7 +181,7 @@ public class EditorActivity extends Activity {
                 OutputStream os = getContentResolver().openOutputStream(uri);
                 bmp.compress(Bitmap.CompressFormat.JPEG, 95, os);
                 os.close();
-                Toast.makeText(this, "Berhasil simpan ke Galeri!", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Berhasil simpan ke DCIM/Camera!", Toast.LENGTH_LONG).show();
                 finish();
             }
         } catch (Exception e) { Toast.makeText(this, "Gagal simpan", Toast.LENGTH_SHORT).show(); }

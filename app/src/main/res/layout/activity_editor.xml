@@ -12,35 +12,35 @@
         <LinearLayout android:id="@+id/watermarkOverlay" 
             android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:layout_alignParentBottom="true" android:layout_alignParentLeft="true"
-            android:layout_margin="15dp" android:orientation="vertical"
-            android:textColor="#FFFFFF" android:textStyle="bold">
+            android:layout_marginLeft="20dp" android:layout_marginBottom="60dp" 
+            android:orientation="vertical" android:gravity="left">
             
             <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:gravity="center_vertical">
                 
                 <TextView android:id="@+id/tvTime" 
                     android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="17:54" android:textColor="#FFFFFF" android:textSize="40sp" android:textStyle="bold" />
+                    android:text="18:14" android:textColor="#FFFFFF" android:textSize="45sp" android:textStyle="bold" />
                     
                 <View android:layout_width="2dp" android:layout_height="40dp"
-                    android:layout_marginLeft="8dp" android:layout_marginRight="8dp"
+                    android:layout_marginLeft="10dp" android:layout_marginRight="10dp"
                     android:background="@drawable/vertical_divider" />
                     
                 <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:orientation="vertical">
                     <TextView android:id="@+id/tvDate" 
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="28/03/2026" android:textColor="#FFFFFF" android:textSize="12sp" />
+                        android:text="28/03/2026" android:textColor="#FFFFFF" android:textSize="14sp" />
                     <TextView android:id="@+id/tvDay" 
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="Sat" android:textColor="#FFFFFF" android:textSize="12sp" />
+                        android:text="Sat" android:textColor="#FFFFFF" android:textSize="14sp" />
                 </LinearLayout>
             </LinearLayout>
 
             <TextView android:id="@+id/tvAddress" 
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginTop="5dp" android:maxWidth="250dp"
-                android:text="Jl. Nusa Indah, Caruban..." android:textColor="#FFFFFF" android:textSize="10sp" />
+                android:layout_marginTop="8dp" android:maxWidth="280dp"
+                android:text="Jl. Nusa Indah, Caruban, Bangunsari, Kec. Mejayan..." android:textColor="#FFFFFF" android:textSize="11sp" />
         </LinearLayout>
     </RelativeLayout>
 
