@@ -20,13 +20,12 @@ public class EditorActivity extends Activity {
         try { System.loadLibrary("odfiz_native"); } catch (UnsatisfiedLinkError e) {}
     }
 
-    public native String helloFromRust();
-
     private ImageView imgView;
     private TextView tvTime, tvDate, tvDay, tvAddress;
     private EditText etWatermark;
     private Bitmap baseBmp;
     private SharedPreferences prefs;
+    private boolean isUserEditing = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +33,21 @@ public class EditorActivity extends Activity {
         setContentView(R.layout.activity_editor);
         
         prefs = getSharedPreferences("OdfizPrefs", MODE_PRIVATE);
+        initViews();
+        
+        // 1. Load Foto (Pake delay dikit biar UI muncul dulu, anti-blank putih)
+        imgView.postDelayed(this::loadOptimizedPhoto, 300);
+
+        // 2. Tombol-tombol
+        findViewById(R.id.btnCancel).setOnClickListener(v -> {
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+        });
+
+        findViewById(R.id.btnSave).setOnClickListener(v -> saveToGallery());
+    }
+
+    private void initViews() {
         imgView = findViewById(R.id.imageViewEditor);
         tvTime = findViewById(R.id.tvTime);
         tvDate = findViewById(R.id.tvDate);
@@ -41,19 +55,23 @@ public class EditorActivity extends Activity {
         tvAddress = findViewById(R.id.tvAddress);
         etWatermark = findViewById(R.id.editWatermarkText);
 
-        loadOptimizedPhoto();
-
-        findViewById(R.id.btnCancel).setOnClickListener(v -> {
-            startActivity(new Intent(this, MainActivity.class));
-            finish();
+        // Biar bisa diedit manual tanpa ditimpa GPS otomatis
+        etWatermark.setOnFocusChangeListener((v, hasFocus) -> isUserEditing = hasFocus);
+        
+        etWatermark.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (isUserEditing) { // Update tampilan hanya jika user yang ngetik
+                    String[] p = s.toString().split("\\|");
+                    if (p.length >= 4) {
+                        tvTime.setText(p[0]); tvDate.setText(p[1]);
+                        tvDay.setText(p[2]); tvAddress.setText(p[3]);
+                    }
+                }
+            }
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void afterTextChanged(Editable s) {}
         });
-
-        findViewById(R.id.btnSave).setOnClickListener(v -> saveToGallery());
-
-        try {
-            String s = helloFromRust();
-            if (s != null) Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {}
     }
 
     private void loadOptimizedPhoto() {
@@ -61,69 +79,79 @@ public class EditorActivity extends Activity {
         if (uriStr == null) return;
         try {
             Uri uri = Uri.parse(uriStr);
-            // Trik Resolusi: Cek ukuran tanpa muat ke RAM dulu
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inJustDecodeBounds = true;
+            BitmapFactory.Options opt = new BitmapFactory.Options();
+            opt.inSampleSize = 2; // Paksa kecilin dikit biar enteng
             InputStream is = getContentResolver().openInputStream(uri);
-            BitmapFactory.decodeStream(is, null, options);
-            is.close();
-
-            // Hitung sample size (biar nggak blank putih)
-            options.inSampleSize = calculateInSampleSize(options, 1280, 1280);
-            options.inJustDecodeBounds = false;
-            
-            is = getContentResolver().openInputStream(uri);
-            Bitmap raw = BitmapFactory.decodeStream(is, null, options);
+            Bitmap raw = BitmapFactory.decodeStream(is);
             is.close();
             
-            // Perbaiki Rotasi
             if (raw.getWidth() > raw.getHeight()) {
                 Matrix m = new Matrix(); m.postRotate(90);
                 baseBmp = Bitmap.createBitmap(raw, 0, 0, raw.getWidth(), raw.getHeight(), m, true);
             } else { baseBmp = raw; }
             
             imgView.setImageBitmap(baseBmp);
-            setupLabels();
-        } catch (Exception e) { finish(); }
+            updateDateTime();
+            startGPS(); // GPS jalan di belakang
+        } catch (Exception e) {}
     }
 
-    private int calculateInSampleSize(BitmapFactory.Options options, int reqW, int reqH) {
-        final int h = options.outHeight;
-        final int w = options.outWidth;
-        int inSampleSize = 1;
-        if (h > reqH || w > reqW) {
-            final int halfH = h / 2;
-            final int halfW = w / 2;
-            while ((halfH / inSampleSize) >= reqH && (halfW / inSampleSize) >= reqW) {
-                inSampleSize *= 2;
+    private void updateDateTime() {
+        String t = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+        String d = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(new Date());
+        String y = new SimpleDateFormat("EEE", Locale.getDefault()).format(new Date());
+        String a = prefs.getString("last_addr", "Mencari lokasi...");
+
+        tvTime.setText(t); tvDate.setText(d); tvDay.setText(y); tvAddress.setText(a);
+        if (!isUserEditing) etWatermark.setText(t + "|" + d + "|" + y + "|" + a);
+    }
+
+    private void startGPS() {
+        new Thread(() -> {
+            try {
+                LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+                Criteria criteria = new Criteria();
+                criteria.setAccuracy(Criteria.ACCURACY_COARSE);
+                String provider = lm.getBestProvider(criteria, true);
+                
+                if (provider != null) {
+                    Location loc = lm.getLastKnownLocation(provider);
+                    if (loc != null) processLocation(loc);
+                }
+            } catch (Exception e) {}
+        }).start();
+    }
+
+    private void processLocation(Location loc) {
+        try {
+            Geocoder g = new Geocoder(this, Locale.getDefault());
+            List<Address> addresses = g.getFromLocation(loc.getLatitude(), loc.getLongitude(), 1);
+            if (addresses != null && !addresses.isEmpty()) {
+                String addr = addresses.get(0).getAddressLine(0);
+                prefs.edit().putString("last_addr", addr).apply();
+                runOnUiThread(() -> {
+                    if (!isUserEditing) {
+                        tvAddress.setText(addr);
+                        updateDateTime(); 
+                    }
+                });
             }
-        }
-        return inSampleSize;
-    }
-
-    private void setupLabels() {
-        String time = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
-        String date = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(new Date());
-        String day = new SimpleDateFormat("EEE", Locale.getDefault()).format(new Date());
-        String addr = prefs.getString("last_addr", "Mencari lokasi...");
-
-        tvTime.setText(time); tvDate.setText(date); tvDay.setText(day); tvAddress.setText(addr);
-        etWatermark.setText(time + "|" + date + "|" + day + "|" + addr);
+        } catch (Exception e) {}
     }
 
     private void saveToGallery() {
         if (baseBmp == null) return;
-        Toast.makeText(this, "Memproses Gambar...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Menyimpan...", Toast.LENGTH_SHORT).show();
 
         Bitmap out = baseBmp.copy(Bitmap.Config.ARGB_8888, true);
         Canvas cv = new Canvas(out);
         float r = out.getHeight() / 1000f;
         Paint pt = new Paint(Paint.ANTI_ALIAS_FLAG);
         pt.setColor(Color.WHITE);
-        pt.setTextSize(70 * r);
-        pt.setShadowLayer(5 * r, 0, 0, Color.BLACK);
+        pt.setTextSize(60 * r);
+        pt.setShadowLayer(3 * r, 0, 0, Color.BLACK);
         
-        cv.drawText(tvTime.getText().toString() + " " + tvDate.getText().toString(), 40 * r, out.getHeight() - (100 * r), pt);
+        cv.drawText(tvTime.getText().toString() + " | " + tvAddress.getText().toString(), 40 * r, out.getHeight() - (80 * r), pt);
 
         ContentValues v = new ContentValues();
         v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_" + System.currentTimeMillis() + ".jpg");
@@ -136,7 +164,7 @@ public class EditorActivity extends Activity {
                 OutputStream os = getContentResolver().openOutputStream(u);
                 out.compress(Bitmap.CompressFormat.JPEG, 90, os);
                 os.close();
-                Toast.makeText(this, "Berhasil Simpan!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Tersimpan!", Toast.LENGTH_SHORT).show();
                 startActivity(new Intent(this, MainActivity.class));
                 finish();
             }
