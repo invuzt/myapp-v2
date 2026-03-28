@@ -18,19 +18,33 @@ public class MainActivity extends Activity {
     private Uri photoUri;
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        findViewById(R.id.button1).setOnClickListener(v -> checkPermissions());
+        // Langsung cek izin saat app dibuka
+        checkPermissions();
     }
 
     private void checkPermissions() {
-        String[] permissions = {Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION};
+        String[] permissions = {
+            Manifest.permission.CAMERA, 
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        };
+        
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
             checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(permissions, PERMISSION_CODE);
         } else {
             bukaKamera();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == PERMISSION_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            bukaKamera();
+        } else {
+            finish(); // Tutup app jika izin ditolak
         }
     }
 
@@ -41,14 +55,23 @@ public class MainActivity extends Activity {
             photoUri = FileProvider.getUriForFile(this, "com.myapp.fileprovider", photoFile);
             intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
             startActivityForResult(intent, CAMERA_REQUEST);
-        } catch (IOException e) {}
+        } catch (IOException e) {
+            finish();
+        }
     }
 
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == CAMERA_REQUEST && resultCode == Activity.RESULT_OK) {
-            Intent intent = new Intent(this, EditorActivity.class);
-            intent.putExtra("PHOTO_URI", photoUri.toString());
-            startActivity(intent);
+        if (requestCode == CAMERA_REQUEST) {
+            if (resultCode == Activity.RESULT_OK) {
+                // Jika foto sukses, langsung ke Editor (Watermark otomatis muncul di sana)
+                Intent intent = new Intent(this, EditorActivity.class);
+                intent.putExtra("PHOTO_URI", photoUri.toString());
+                startActivity(intent);
+                finish(); // Tutup MainActivity agar tidak balik ke layar kosong
+            } else {
+                finish(); // Jika batal foto, tutup app
+            }
         }
     }
 }
