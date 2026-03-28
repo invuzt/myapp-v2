@@ -26,6 +26,7 @@ public class EditorActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Paksa layar hitam sejak awal agar tidak ada putih-putih
         getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
         setContentView(R.layout.activity_editor);
         
@@ -37,24 +38,29 @@ public class EditorActivity extends Activity {
         tvAddress = findViewById(R.id.tvAddress);
         etWatermark = findViewById(R.id.editWatermarkText);
 
-        loadPhotoSync(); // Pakai cara sinkron tapi dioptimasi agar tidak blank putih
-        startGPS();
+        // Langsung muat foto
+        loadPhotoImmediate();
+        
+        // Panggil lokasi (Ambil yang terakhir tersimpan agar cepat)
+        String lastAddr = prefs.getString("last_addr", "Mencari lokasi...");
+        tvAddress.setText(lastAddr);
+        updateTimeLabels();
 
         findViewById(R.id.btnCancel).setOnClickListener(v -> {
             startActivity(new Intent(this, MainActivity.class));
             finish();
         });
 
-        findViewById(R.id.btnSave).setOnClickListener(v -> saveWithWatermark());
+        findViewById(R.id.btnSave).setOnClickListener(v -> saveWithWatermarkFinal());
     }
 
-    private void loadPhotoSync() {
+    private void loadPhotoImmediate() {
         String uriStr = getIntent().getStringExtra("PHOTO_URI");
         if (uriStr == null) return;
         try {
             Uri uri = Uri.parse(uriStr);
             BitmapFactory.Options opt = new BitmapFactory.Options();
-            opt.inSampleSize = 2; 
+            opt.inSampleSize = 2; // Kecilkan resolusi agar RAM aman
             InputStream is = getContentResolver().openInputStream(uri);
             Bitmap raw = BitmapFactory.decodeStream(is);
             is.close();
@@ -65,74 +71,49 @@ public class EditorActivity extends Activity {
             } else { baseBmp = raw; }
             
             imgView.setImageBitmap(baseBmp);
-            updateLabels();
         } catch (Exception e) {}
     }
 
-    private void updateLabels() {
+    private void updateTimeLabels() {
         String t = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
         String d = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(new Date());
         String y = new SimpleDateFormat("EEE", Locale.getDefault()).format(new Date());
-        // Ambil lokasi terakhir dari memori agar TIDAK LOADING TERUS
-        String a = prefs.getString("last_addr", "Mencari lokasi...");
-
-        tvTime.setText(t); tvDate.setText(d); tvDay.setText(y); tvAddress.setText(a);
-        etWatermark.setText(t + "|" + d + "|" + y + "|" + a);
+        tvTime.setText(t); tvDate.setText(d); tvDay.setText(y);
+        etWatermark.setText(t + "|" + d + "|" + y + "|" + tvAddress.getText());
     }
 
-    private void startGPS() {
-        try {
-            LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
-            Location loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-            if (loc != null) {
-                Geocoder g = new Geocoder(this, Locale.getDefault());
-                List<Address> addrs = g.getFromLocation(loc.getLatitude(), loc.getLongitude(), 1);
-                if (addrs != null && !addrs.isEmpty()) {
-                    String addr = addrs.get(0).getAddressLine(0);
-                    prefs.edit().putString("last_addr", addr).apply();
-                    runOnUiThread(() -> {
-                        tvAddress.setText(addr);
-                        String t = tvTime.getText().toString();
-                        String d = tvDate.getText().toString();
-                        String y = tvDay.getText().toString();
-                        etWatermark.setText(t + "|" + d + "|" + y + "|" + addr);
-                    });
-                }
-            }
-        } catch (Exception e) {}
-    }
-
-    private void saveWithWatermark() {
+    private void saveWithWatermarkFinal() {
         if (baseBmp == null) return;
-        Toast.makeText(this, "Memproses...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Menyimpan ke Galeri...", Toast.LENGTH_SHORT).show();
 
-        // BUAT WATERMARK MANUAL KE FILE (JAM & ALAMAT)
+        // 1. Buat salinan Bitmap untuk digambar
         Bitmap out = baseBmp.copy(Bitmap.Config.ARGB_8888, true);
         Canvas cv = new Canvas(out);
         float ratio = out.getHeight() / 1000f;
         float padding = 40 * ratio;
 
+        // 2. Setting Paint (Teks)
         Paint pt = new Paint(Paint.ANTI_ALIAS_FLAG);
         pt.setColor(Color.WHITE);
-        pt.setShadowLayer(4 * ratio, 0, 0, Color.BLACK);
+        pt.setShadowLayer(5 * ratio, 0, 0, Color.BLACK);
         
-        // Gambar Jam
-        pt.setTextSize(80 * ratio);
+        // Gambar Waktu (Besar)
+        pt.setTextSize(90 * ratio);
         pt.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-        cv.drawText(tvTime.getText().toString(), padding, out.getHeight() - (180 * ratio), pt);
+        cv.drawText(tvTime.getText().toString(), padding, out.getHeight() - (220 * ratio), pt);
 
-        // Gambar Alamat (Pindah Baris Otomatis)
-        pt.setTextSize(25 * ratio);
+        // Gambar Alamat (Kecil & Rapih)
+        pt.setTextSize(28 * ratio);
         pt.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
         TextPaint tp = new TextPaint(pt);
         StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, (int)(out.getWidth() - (padding*2)), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
         
         cv.save();
-        cv.translate(padding, out.getHeight() - (150 * ratio));
+        cv.translate(padding, out.getHeight() - (180 * ratio));
         sl.draw(cv);
         cv.restore();
 
-        // SIMPAN KE GALERI
+        // 3. Proses Simpan ke Galeri
         ContentValues v = new ContentValues();
         v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_" + System.currentTimeMillis() + ".jpg");
         v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
