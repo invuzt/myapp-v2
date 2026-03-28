@@ -30,15 +30,16 @@ public class EditorActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Trik Anti-Putih: Set background gelap dulu sebelum layout dimuat
+        getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
         setContentView(R.layout.activity_editor);
         
         prefs = getSharedPreferences("OdfizPrefs", MODE_PRIVATE);
         initViews();
         
-        // 1. Load Foto (Pake delay dikit biar UI muncul dulu, anti-blank putih)
+        // Delay loading agar UI muncul dulu tanpa putih-putih
         imgView.postDelayed(this::loadOptimizedPhoto, 300);
 
-        // 2. Tombol-tombol
         findViewById(R.id.btnCancel).setOnClickListener(v -> {
             startActivity(new Intent(this, MainActivity.class));
             finish();
@@ -55,18 +56,16 @@ public class EditorActivity extends Activity {
         tvAddress = findViewById(R.id.tvAddress);
         etWatermark = findViewById(R.id.editWatermarkText);
 
-        // Biar bisa diedit manual tanpa ditimpa GPS otomatis
         etWatermark.setOnFocusChangeListener((v, hasFocus) -> isUserEditing = hasFocus);
-        
         etWatermark.addTextChangedListener(new TextWatcher() {
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (isUserEditing) { // Update tampilan hanya jika user yang ngetik
+                if (isUserEditing) {
                     String[] p = s.toString().split("\\|");
-                    if (p.length >= 4) {
-                        tvTime.setText(p[0]); tvDate.setText(p[1]);
-                        tvDay.setText(p[2]); tvAddress.setText(p[3]);
-                    }
+                    if (p.length >= 1) tvTime.setText(p[0]);
+                    if (p.length >= 2) tvDate.setText(p[1]);
+                    if (p.length >= 3) tvDay.setText(p[2]);
+                    if (p.length >= 4) tvAddress.setText(p[3]);
                 }
             }
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -80,7 +79,7 @@ public class EditorActivity extends Activity {
         try {
             Uri uri = Uri.parse(uriStr);
             BitmapFactory.Options opt = new BitmapFactory.Options();
-            opt.inSampleSize = 2; // Paksa kecilin dikit biar enteng
+            opt.inSampleSize = 2; // Paksa kecilin biar RAM nggak sesak
             InputStream is = getContentResolver().openInputStream(uri);
             Bitmap raw = BitmapFactory.decodeStream(is);
             is.close();
@@ -92,7 +91,7 @@ public class EditorActivity extends Activity {
             
             imgView.setImageBitmap(baseBmp);
             updateDateTime();
-            startGPS(); // GPS jalan di belakang
+            startGPS();
         } catch (Exception e) {}
     }
 
@@ -102,22 +101,18 @@ public class EditorActivity extends Activity {
         String y = new SimpleDateFormat("EEE", Locale.getDefault()).format(new Date());
         String a = prefs.getString("last_addr", "Mencari lokasi...");
 
-        tvTime.setText(t); tvDate.setText(d); tvDay.setText(y); tvAddress.setText(a);
-        if (!isUserEditing) etWatermark.setText(t + "|" + d + "|" + y + "|" + a);
+        runOnUiThread(() -> {
+            tvTime.setText(t); tvDate.setText(d); tvDay.setText(y); tvAddress.setText(a);
+            if (!isUserEditing) etWatermark.setText(t + "|" + d + "|" + y + "|" + a);
+        });
     }
 
     private void startGPS() {
         new Thread(() -> {
             try {
                 LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
-                Criteria criteria = new Criteria();
-                criteria.setAccuracy(Criteria.ACCURACY_COARSE);
-                String provider = lm.getBestProvider(criteria, true);
-                
-                if (provider != null) {
-                    Location loc = lm.getLastKnownLocation(provider);
-                    if (loc != null) processLocation(loc);
-                }
+                Location loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                if (loc != null) processLocation(loc);
             } catch (Exception e) {}
         }).start();
     }
@@ -129,30 +124,46 @@ public class EditorActivity extends Activity {
             if (addresses != null && !addresses.isEmpty()) {
                 String addr = addresses.get(0).getAddressLine(0);
                 prefs.edit().putString("last_addr", addr).apply();
-                runOnUiThread(() -> {
-                    if (!isUserEditing) {
-                        tvAddress.setText(addr);
-                        updateDateTime(); 
-                    }
-                });
+                updateDateTime();
             }
         } catch (Exception e) {}
     }
 
     private void saveToGallery() {
         if (baseBmp == null) return;
-        Toast.makeText(this, "Menyimpan...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Memproses Gambar...", Toast.LENGTH_SHORT).show();
 
         Bitmap out = baseBmp.copy(Bitmap.Config.ARGB_8888, true);
         Canvas cv = new Canvas(out);
-        float r = out.getHeight() / 1000f;
+        
+        // Kalkulasi Rasio agar TIDAK TERPOTONG
+        float ratio = out.getHeight() / 1000f;
+        float padding = 40 * ratio;
+
         Paint pt = new Paint(Paint.ANTI_ALIAS_FLAG);
         pt.setColor(Color.WHITE);
-        pt.setTextSize(60 * r);
-        pt.setShadowLayer(3 * r, 0, 0, Color.BLACK);
+        pt.setShadowLayer(4 * ratio, 0, 0, Color.BLACK);
+        pt.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
         
-        cv.drawText(tvTime.getText().toString() + " | " + tvAddress.getText().toString(), 40 * r, out.getHeight() - (80 * r), pt);
+        // Gambar Jam (Besar)
+        pt.setTextSize(90 * ratio);
+        String timeStr = tvTime.getText().toString();
+        cv.drawText(timeStr, padding, out.getHeight() - (180 * ratio), pt);
 
+        // Gambar Alamat (Kecil & Otomatis Pindah Baris)
+        pt.setTextSize(25 * ratio);
+        pt.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
+        TextPaint tp = new TextPaint(pt);
+        int maxWidth = (int) (out.getWidth() - (padding * 2));
+        
+        StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, maxWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+        
+        cv.save();
+        cv.translate(padding, out.getHeight() - (150 * ratio));
+        sl.draw(cv);
+        cv.restore();
+
+        // Simpan
         ContentValues v = new ContentValues();
         v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_" + System.currentTimeMillis() + ".jpg");
         v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
@@ -164,7 +175,7 @@ public class EditorActivity extends Activity {
                 OutputStream os = getContentResolver().openOutputStream(u);
                 out.compress(Bitmap.CompressFormat.JPEG, 90, os);
                 os.close();
-                Toast.makeText(this, "Tersimpan!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Berhasil!", Toast.LENGTH_SHORT).show();
                 startActivity(new Intent(this, MainActivity.class));
                 finish();
             }
