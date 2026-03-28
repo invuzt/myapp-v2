@@ -16,17 +16,12 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class EditorActivity extends Activity {
-
-    // Jalur komunikasi ke mesin Rust
     static {
         try {
             System.loadLibrary("odfiz_native");
-        } catch (UnsatisfiedLinkError e) {
-            // Jika Rust belum terpasang, aplikasi tidak akan force close
-        }
+        } catch (UnsatisfiedLinkError e) {}
     }
 
-    // Deklarasi fungsi dari Rust
     public native String helloFromRust();
 
     private ImageView imgView;
@@ -39,12 +34,10 @@ public class EditorActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_editor);
-
         prefs = getSharedPreferences("OdfizPrefs", MODE_PRIVATE);
         initViews();
         loadInitialData();
 
-        // Test apakah Rust sudah aktif (muncul pesan singkat)
         try {
             String status = helloFromRust();
             if (status != null) Toast.makeText(this, status, Toast.LENGTH_SHORT).show();
@@ -91,7 +84,6 @@ public class EditorActivity extends Activity {
         SimpleDateFormat st = new SimpleDateFormat("HH:mm", Locale.getDefault());
         SimpleDateFormat sd = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         SimpleDateFormat sy = new SimpleDateFormat("EEE", Locale.getDefault());
-        
         String time = st.format(new Date());
         String date = sd.format(new Date());
         String day = sy.format(new Date());
@@ -99,7 +91,6 @@ public class EditorActivity extends Activity {
 
         tvTime.setText(time); tvDate.setText(date); tvDay.setText(day); tvAddress.setText(addr);
         etWatermark.setText(time + "|" + date + "|" + day + "|" + addr);
-
         new Thread(() -> fetchLocation(time, date, day)).start();
     }
 
@@ -123,6 +114,8 @@ public class EditorActivity extends Activity {
     }
 
     private void saveProcessedImage() {
+        // Saat ini masih menggunakan Canvas Java (Stabil)
+        // Ke depannya kita akan 'bypass' bitmap ini langsung ke Rust
         if (baseBmp == null) return;
         Bitmap out = baseBmp.copy(Bitmap.Config.ARGB_8888, true);
         Canvas cv = new Canvas(out);
@@ -143,7 +136,7 @@ public class EditorActivity extends Activity {
         float yT = yB - b.height();
         cv.drawText(ts, p, yB, pt);
 
-        pt.setColor(Color.parseColor("#FFD700"));
+        pt.setColor(Color.parseColor("#4CAF50")); // Ganti jadi Hijau Profesional
         pt.setStrokeWidth(6 * r);
         float xG = p + pt.measureText(ts) + (18 * r);
         cv.drawLine(xG, yT, xG, yB, pt);
