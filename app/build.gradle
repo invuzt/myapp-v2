@@ -10,8 +10,11 @@ android {
         applicationId "com.odfiz.timemark"
         minSdk 24
         targetSdk 34
-        versionCode 2
-        versionName "1.1"
+        versionCode 3
+        versionName "1.2"
+        
+        // Tambahkan ini biar Gradle tidak protes soal SDK 34
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -28,7 +31,8 @@ android {
 }
 
 dependencies {
-    // Hanya gunakan yang benar-benar perlu untuk hemat size
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    // Library ini WAJIB ada supaya tema NoActionBar tidak error
+    implementation 'com.google.android.material:material:1.9.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 }
