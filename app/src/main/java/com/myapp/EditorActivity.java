@@ -1,22 +1,21 @@
 package com.myapp;
 
 import android.app.Activity;
-import android.content.Intent;
+import android.content.ContentValues;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-import java.io.IOException;
 import java.io.OutputStream;
 
 public class EditorActivity extends Activity {
@@ -34,23 +33,26 @@ public class EditorActivity extends Activity {
         watermarkOverlay = findViewById(R.id.watermarkOverlay);
         editWatermark = findViewById(R.id.editWatermarkText);
 
-        // Ambil URI Foto dari Intent
         String uriString = getIntent().getStringExtra("PHOTO_URI");
         if (uriString != null) {
-            Uri photoUri = Uri.parse(uriString);
             try {
-                // Load foto asli
-                originalBitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), photoUri);
+                Bitmap raw = MediaStore.Images.Media.getBitmap(getContentResolver(), Uri.parse(uriString));
+                // Perbaiki rotasi 90 derajat jika miring
+                if (raw.getWidth() > raw.getHeight()) {
+                    Matrix matrix = new Matrix();
+                    matrix.postRotate(90);
+                    originalBitmap = Bitmap.createBitmap(raw, 0, 0, raw.getWidth(), raw.getHeight(), matrix, true);
+                } else {
+                    originalBitmap = raw;
+                }
                 imageView.setImageBitmap(originalBitmap);
-            } catch (IOException e) { e.printStackTrace(); }
+            } catch (Exception e) { e.printStackTrace(); }
         }
 
-        // Logika Edit Teks Real-time
         editWatermark.addTextChangedListener(new TextWatcher() {
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (s.length() > 0) watermarkOverlay.setText(s);
-                else watermarkOverlay.setText("odfiz"); // Default jika kosong
+                watermarkOverlay.setText(s.length() > 0 ? s : "odfiz");
             }
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void afterTextChanged(Editable s) {}
@@ -63,44 +65,45 @@ public class EditorActivity extends Activity {
     private void processAndSave() {
         if (originalBitmap == null) return;
         
-        // Buat bitmap baru yang bisa diedit
-        Bitmap finalBitmap = originalBitmap.copy(originalBitmap.getConfig(), true);
-        Canvas canvas = new Canvas(finalBitmap);
+        // 1. Buat salinan Bitmap untuk digambar watermark secara permanen
+        Bitmap workingBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true);
+        Canvas canvas = new Canvas(workingBitmap);
         
-        // Ambil teks dari TextView overlay
-        String textToDraw = watermarkOverlay.getText().toString();
+        String text = watermarkOverlay.getText().toString();
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(Color.WHITE);
+        paint.setAlpha(200);
+        // Ukuran teks proporsional terhadap resolusi asli foto
+        paint.setTextSize(workingBitmap.getHeight() / 20); 
+        paint.setShadowLayer(5f, 0f, 0f, Color.BLACK);
 
-        Paint paint = new Paint();
-        paint.setColor(Color.WHITE); // Warna teks
-        paint.setAlpha(180); // Transparansi
-        paint.setTextSize(finalBitmap.getHeight() / 15); // Ukuran proporsional
-        paint.setAntiAlias(true);
-        paint.setFakeBoldText(true);
+        float x = workingBitmap.getWidth() - paint.measureText(text) - 40;
+        float y = workingBitmap.getHeight() - 40;
         
-        // Hitung posisi (Kanan Bawah dengan padding)
-        float textWidth = paint.measureText(textToDraw);
-        float x = finalBitmap.getWidth() - textWidth - (finalBitmap.getWidth() / 20);
-        float y = finalBitmap.getHeight() - (finalBitmap.getHeight() / 20);
-        
-        // Gambar teks ke foto
-        canvas.drawText(textToDraw, x, y, paint);
+        canvas.drawText(text, x, y, paint);
 
-        // SIMPAN KE GALERI (DCIM/Camera)
-        simpanKeGaleri(finalBitmap);
+        // 2. Simpan ke Galeri (DCIM/Camera)
+        saveToGallery(workingBitmap);
     }
 
-    private void simpanKeGaleri(Bitmap bitmap) {
-        OutputStream fos;
+    private void saveToGallery(Bitmap bitmap) {
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_" + System.currentTimeMillis() + ".jpg");
+        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+        values.put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/Camera");
+
+        Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+        
         try {
-            // Gunakan MediaStore untuk Android modern (API 29+)
-            Uri imageUri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
-            Intent intent = new Intent(Intent.ACTION_SEND);
-            intent.setType("image/jpeg");
-            intent.putExtra(Intent.EXTRA_STREAM, imageUri);
-            startActivity(Intent.createChooser(intent, "Bagikan Foto Ber-watermark"));
-            finish(); // Tutup editor setelah selesai
+            if (uri != null) {
+                OutputStream out = getContentResolver().openOutputStream(uri);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
+                out.close();
+                Toast.makeText(this, "Foto tersimpan di Galeri!", Toast.LENGTH_LONG).show();
+                finish();
+            }
         } catch (Exception e) {
-            Toast.makeText(this, "Gagal memproses foto", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Gagal simpan: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 }
