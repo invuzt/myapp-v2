@@ -1,0 +1,34 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="#111111">
+    
+    <RelativeLayout android:id="@+id/photo_container" 
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:layout_above="@+id/editor_tools">
+        <ImageView android:id="@+id/imageViewEditor" 
+            android:layout_width="match_parent" android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+        <TextView android:id="@+id/watermarkOverlay" 
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true" android:layout_alignParentRight="true"
+            android:layout_margin="15dp" android:textColor="#AAFFFFFF" 
+            android:textSize="20sp" android:textStyle="bold" android:text="odfiz" />
+    </RelativeLayout>
+
+    <LinearLayout android:id="@+id/editor_tools" 
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true" android:orientation="vertical"
+        android:background="#222222" android:padding="10dp">
+        <EditText android:id="@+id/editWatermarkText" 
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:hint="Masukkan teks watermark..." android:textColor="#FFFFFF"
+            android:backgroundTint="#FFFFFF" android:layout_marginBottom="10dp"/>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+            <Button android:id="@+id/btnCancel" android:layout_width="0dp" 
+                android:layout_weight="1" android:layout_height="wrap_content" 
+                android:text="Batal" android:backgroundTint="#FF5555" android:layout_marginRight="5dp"/>
+            <Button android:id="@+id/btnSave" android:layout_width="0dp" 
+                android:layout_weight="1" android:layout_height="wrap_content" 
+                android:text="Simpan & Bagikan" android:layout_marginLeft="5dp"/>
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>
