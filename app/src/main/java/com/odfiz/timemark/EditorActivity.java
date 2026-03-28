@@ -5,7 +5,6 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.*;
-import android.location.*;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -16,53 +15,56 @@ import java.util.*;
 
 public class EditorActivity extends Activity {
     private ImageView imgView;
-    private TextView tvTime, tvAddress;
     private Bitmap baseBmp;
-    private SharedPreferences prefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_editor);
         
-        prefs = getSharedPreferences("OdfizPrefs", MODE_PRIVATE);
         imgView = findViewById(R.id.imageViewEditor);
-        tvTime = findViewById(R.id.tvTime);
-        tvAddress = findViewById(R.id.tvAddress);
+        TextView tvTime = findViewById(R.id.tvTime);
+        TextView tvAddr = findViewById(R.id.tvAddress);
+        SharedPreferences prefs = getSharedPreferences("OdfizPrefs", MODE_PRIVATE);
 
-        // Load foto standar (tanpa aneh-aneh)
+        // 1. Ambil Foto
         String uriStr = getIntent().getStringExtra("PHOTO_URI");
         if (uriStr != null) {
             try {
-                baseBmp = BitmapFactory.decodeStream(getContentResolver().openInputStream(Uri.parse(uriStr)));
+                // Pakai sample size 2 biar HP nggak berat
+                BitmapFactory.Options opt = new BitmapFactory.Options();
+                opt.inSampleSize = 2;
+                baseBmp = BitmapFactory.decodeStream(getContentResolver().openInputStream(Uri.parse(uriStr)), null, opt);
                 imgView.setImageBitmap(baseBmp);
             } catch (Exception e) { finish(); }
         }
 
-        // Tampilkan waktu & lokasi terakhir yang tersimpan
-        String time = new SimpleDateFormat("HH:mm | dd/MM/yyyy", Locale.getDefault()).format(new Date());
-        String addr = prefs.getString("last_addr", "Lokasi...");
-        tvTime.setText(time);
-        tvAddress.setText(addr);
+        // 2. Set Teks (Ambil yang ada saja)
+        tvTime.setText(new SimpleDateFormat("HH:mm | dd-MM-yyyy", Locale.getDefault()).format(new Date()));
+        tvAddr.setText(prefs.getString("last_addr", "Lokasi Terdeteksi"));
 
+        // 3. Tombol Batal
         findViewById(R.id.btnCancel).setOnClickListener(v -> finish());
-        findViewById(R.id.btnSave).setOnClickListener(v -> saveFile());
+
+        // 4. Tombol Simpan (Murni simpan apa adanya)
+        findViewById(R.id.btnSave).setOnClickListener(v -> {
+            if (baseBmp == null) return;
+            saveToGallery();
+        });
     }
 
-    private void saveFile() {
-        if (baseBmp == null) return;
+    private void saveToGallery() {
         ContentValues v = new ContentValues();
         v.put(MediaStore.Images.Media.DISPLAY_NAME, "Odfiz_" + System.currentTimeMillis() + ".jpg");
         v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
         v.put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/Camera");
-
         try {
             Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
             if (u != null) {
                 OutputStream os = getContentResolver().openOutputStream(u);
-                baseBmp.compress(Bitmap.CompressFormat.JPEG, 95, os);
+                baseBmp.compress(Bitmap.CompressFormat.JPEG, 90, os);
                 os.close();
-                Toast.makeText(this, "Tersimpan!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Berhasil Simpan!", Toast.LENGTH_SHORT).show();
                 finish();
             }
         } catch (Exception e) {}
