@@ -3,6 +3,7 @@ package com.myapp;
 import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.*;
 import android.location.*;
 import android.net.Uri;
@@ -20,12 +21,14 @@ public class EditorActivity extends Activity {
     private TextView tvTime, tvDate, tvDay, tvAddress;
     private EditText editWatermark;
     private Bitmap originalBitmap;
+    private SharedPreferences prefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_editor);
 
+        prefs = getSharedPreferences("OdfizPrefs", MODE_PRIVATE);
         imageView = findViewById(R.id.imageViewEditor);
         tvTime = findViewById(R.id.tvTime);
         tvDate = findViewById(R.id.tvDate);
@@ -81,16 +84,28 @@ public class EditorActivity extends Activity {
         String sTime = sdfTime.format(new Date());
         String sDate = sdfDate.format(new Date());
         String sDay = sdfDay.format(new Date());
-        String sAddress = "Mencari lokasi...";
+        
+        // Ambil alamat terakhir yang tersimpan di memori sebagai cadangan
+        String lastAddress = prefs.getString("last_address", "Lokasi tidak diketahui");
+        String sAddress = lastAddress;
+
         try {
             LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
-            Location loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            // Coba ambil lokasi dari GPS atau Network
+            Location loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (loc == null) loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            
             if (loc != null) {
                 Geocoder geo = new Geocoder(this, Locale.getDefault());
                 List<Address> addrs = geo.getFromLocation(loc.getLatitude(), loc.getLongitude(), 1);
-                if (addrs != null && !addrs.isEmpty()) sAddress = addrs.get(0).getAddressLine(0);
+                if (addrs != null && !addrs.isEmpty()) {
+                    sAddress = addrs.get(0).getAddressLine(0);
+                    // Simpan alamat baru ini ke memori untuk penggunaan berikutnya (offline)
+                    prefs.edit().putString("last_address", sAddress).apply();
+                }
             }
         } catch (Exception e) {}
+
         tvTime.setText(sTime); tvDate.setText(sDate); tvDay.setText(sDay); tvAddress.setText(sAddress);
         editWatermark.setText(sTime + "|" + sDate + "|" + sDay + "|" + sAddress);
     }
@@ -101,7 +116,6 @@ public class EditorActivity extends Activity {
         Canvas canvas = new Canvas(finalBmp);
         float bW = finalBmp.getWidth();
         float bH = finalBmp.getHeight();
-        
         float ratio = bH / 1000f; 
         float padding = 45 * ratio;
         
@@ -110,13 +124,12 @@ public class EditorActivity extends Activity {
         paint.setShadowLayer(6 * ratio, 0, 0, Color.BLACK);
         paint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
 
-        // 1. Ambil Tinggi Jam untuk Patokan Garis
+        // 1. Tinggi Jam
         float jamSize = 85 * ratio;
         paint.setTextSize(jamSize);
         Rect jamBounds = new Rect();
         String timeStr = tvTime.getText().toString();
         paint.getTextBounds(timeStr, 0, timeStr.length(), jamBounds);
-        
         float yBaselineJam = bH - (180 * ratio);
         float jamTop = yBaselineJam - jamBounds.height();
         float jamBottom = yBaselineJam;
@@ -124,24 +137,21 @@ public class EditorActivity extends Activity {
         // 2. Gambar Jam
         canvas.drawText(timeStr, padding, yBaselineJam, paint);
 
-        // 3. Garis Kuning (Tinggi persis sama dengan Jam)
+        // 3. Garis Kuning
         float xGaris = padding + paint.measureText(timeStr) + (18 * ratio);
         paint.setColor(Color.parseColor("#FFD700"));
         paint.setStrokeWidth(5 * ratio);
         canvas.drawLine(xGaris, jamTop, xGaris, jamBottom, paint);
 
-        // 4. Tanggal & Hari (Sejajar Atas & Bawah Garis)
+        // 4. Tanggal & Hari
         paint.setColor(Color.WHITE);
         paint.setTextSize(26 * ratio);
         paint.setStrokeWidth(1);
         paint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL));
-        
-        // Tanggal mepet atas garis
         canvas.drawText(tvDate.getText().toString(), xGaris + (18 * ratio), jamTop + (24 * ratio), paint);
-        // Hari mepet bawah garis
         canvas.drawText(tvDay.getText().toString(), xGaris + (18 * ratio), jamBottom - (2 * ratio), paint);
 
-        // 5. Alamat (Di bawah Jam)
+        // 5. Alamat
         paint.setTextSize(23 * ratio);
         TextPaint tp = new TextPaint(paint);
         StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, (int)(bW - (padding * 2)), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
@@ -165,7 +175,6 @@ public class EditorActivity extends Activity {
                 bmp.compress(Bitmap.CompressFormat.JPEG, 95, os);
                 os.close();
                 Toast.makeText(this, "Foto Tersimpan!", Toast.LENGTH_SHORT).show();
-                
                 startActivity(new Intent(this, MainActivity.class));
                 finish();
             }
