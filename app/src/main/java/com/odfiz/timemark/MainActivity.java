@@ -20,22 +20,16 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        checkPerms();
-    }
-
-    private void checkPerms() {
+        // Langsung cek izin tanpa load layout
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
             checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{
-                Manifest.permission.CAMERA, 
-                Manifest.permission.ACCESS_FINE_LOCATION
-            }, PERM_CODE);
+            requestPermissions(new String[]{Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION}, PERM_CODE);
         } else {
-            openCam();
+            launchCamera();
         }
     }
 
-    private void openCam() {
+    private void launchCamera() {
         Intent it = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         try {
             File f = File.createTempFile("odf_", ".jpg", getExternalFilesDir(Environment.DIRECTORY_PICTURES));
@@ -51,7 +45,7 @@ public class MainActivity extends Activity {
             Intent it = new Intent(this, EditorActivity.class);
             it.putExtra("PHOTO_URI", photoUri.toString());
             startActivity(it);
-            finish();
-        } else { finish(); }
+        }
+        finish(); // Langsung tutup agar tidak ada jejak putih
     }
 }
