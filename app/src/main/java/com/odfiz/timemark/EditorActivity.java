@@ -16,6 +16,19 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class EditorActivity extends Activity {
+
+    // Jalur komunikasi ke mesin Rust
+    static {
+        try {
+            System.loadLibrary("odfiz_native");
+        } catch (UnsatisfiedLinkError e) {
+            // Jika Rust belum terpasang, aplikasi tidak akan force close
+        }
+    }
+
+    // Deklarasi fungsi dari Rust
+    public native String helloFromRust();
+
     private ImageView imgView;
     private TextView tvTime, tvDate, tvDay, tvAddress;
     private EditText etWatermark;
@@ -26,11 +39,17 @@ public class EditorActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_editor);
-        
+
         prefs = getSharedPreferences("OdfizPrefs", MODE_PRIVATE);
         initViews();
         loadInitialData();
-        
+
+        // Test apakah Rust sudah aktif (muncul pesan singkat)
+        try {
+            String status = helloFromRust();
+            if (status != null) Toast.makeText(this, status, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {}
+
         findViewById(R.id.btnCancel).setOnClickListener(v -> restartApp());
         findViewById(R.id.btnSave).setOnClickListener(v -> saveProcessedImage());
     }
@@ -60,7 +79,6 @@ public class EditorActivity extends Activity {
     private void loadInitialData() {
         String uriStr = getIntent().getStringExtra("PHOTO_URI");
         if (uriStr == null) { finish(); return; }
-
         try {
             Bitmap raw = MediaStore.Images.Media.getBitmap(getContentResolver(), Uri.parse(uriStr));
             if (raw.getWidth() > raw.getHeight()) {
@@ -70,7 +88,6 @@ public class EditorActivity extends Activity {
             imgView.setImageBitmap(baseBmp);
         } catch (Exception e) { finish(); }
 
-        // Load metadata (Time & Last Address)
         SimpleDateFormat st = new SimpleDateFormat("HH:mm", Locale.getDefault());
         SimpleDateFormat sd = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         SimpleDateFormat sy = new SimpleDateFormat("EEE", Locale.getDefault());
@@ -83,7 +100,6 @@ public class EditorActivity extends Activity {
         tvTime.setText(time); tvDate.setText(date); tvDay.setText(day); tvAddress.setText(addr);
         etWatermark.setText(time + "|" + date + "|" + day + "|" + addr);
 
-        // Update lokasi di background agar tidak lag
         new Thread(() -> fetchLocation(time, date, day)).start();
     }
 
@@ -117,7 +133,6 @@ public class EditorActivity extends Activity {
         pt.setShadowLayer(6 * r, 0, 0, Color.BLACK);
         pt.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
         
-        // Render Jam (Taller scale)
         pt.setColor(Color.WHITE);
         pt.setTextSize(95 * r);
         pt.setTextScaleX(0.82f); 
@@ -128,13 +143,11 @@ public class EditorActivity extends Activity {
         float yT = yB - b.height();
         cv.drawText(ts, p, yB, pt);
 
-        // Render Garis Kuning
         pt.setColor(Color.parseColor("#FFD700"));
         pt.setStrokeWidth(6 * r);
         float xG = p + pt.measureText(ts) + (18 * r);
         cv.drawLine(xG, yT, xG, yB, pt);
 
-        // Render Tanggal & Hari
         pt.setColor(Color.WHITE);
         pt.setTextSize(26 * r);
         pt.setTextScaleX(0.9f);
@@ -142,7 +155,6 @@ public class EditorActivity extends Activity {
         cv.drawText(tvDate.getText().toString(), xG + (18 * r), yT + (24 * r), pt);
         cv.drawText(tvDay.getText().toString(), xG + (18 * r), yB - (2 * r), pt);
 
-        // Render Alamat
         pt.setTextSize(23 * r);
         TextPaint tp = new TextPaint(pt);
         StaticLayout sl = new StaticLayout(tvAddress.getText().toString(), tp, (int)(out.getWidth() - (p * 2)), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
